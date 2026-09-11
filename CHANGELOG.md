@@ -9,3 +9,4 @@
 - LuaLaTeXでPDFを作り直し、5ページで警告が出ないことを確認した。
 - 今後の変更も簡単で自然な日本語で記録する方針を、AGENTS.mdに書いた。
 - 組版中に作られる補助ファイルやログを、Gitの管理対象から外した。
+- 「export」と頼まれたら、原稿（main.tex）、スタイル（newanalogy.sty）、クラス（nlp2026.cls）、参考文献（references.bib）をWindowsのダウンロードフォルダにコピーする手順を、AGENTS.mdに追加した。
