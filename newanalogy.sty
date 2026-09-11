@@ -1,0 +1,87 @@
+%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%
+%%                          newanalogy package
+%%
+%% Purpose: composing analogy made simpler
+%%
+%% The copyright holder of this file is Yves Lepage
+%% (yves.lepage@waseda.jp)
+%%
+%<*driver>
+% \documentclass{ltxdoc}
+% \DisableCrossrefs
+% \begin{document}
+%    \DocInput{ogonek.dtx}
+% \end{document}
+%</driver>
+\def\fileversion{v1.0}
+\def\filedate{2023/09/13} % Written much earlier, maybe three years before
+\def\docdate {2023/09/13}
+%
+%
+%
+%
+%
+%
+%
+%
+%<*style>
+\NeedsTeXFormat{LaTeX2e}[95/06/01]
+
+\ProvidesPackage{newanalogy}[\filedate\space\fileversion\space
+		     Provides macro for analogy]
+
+\usepackage{xparse}
+\usepackage{ifmtarg}
+
+\newcommand{\xanalogy}[6]{\ensuremath{#1 #5 #2 #6 #3 #5 #4}}
+
+\newcommand\yanalogy[7][x]{%
+\ifx i#1\xanalogy{\textit{#2}}{\textit{#3}}{\textit{#4}}{\textit{#5}}{#6}{#7}\else
+\ifx r#1\xanalogy{\textrm{#2}}{\textrm{#3}}{\textrm{#4}}{\textrm{#5}}{#6}{#7}\else
+\ifx d#1\xanalogy{#2}{#3}{#4}{#5}{#6}{#7}\else
+\relax\ifmmode\xanalogy{#2}{#3}{#4}{#5}{#6}{#7}\else
+\xanalogy{\textit{#2}}{\textit{#3}}{\textit{#4}}{\textit{#5}}{#6}{#7}
+\fi\fi\fi\fi
+}
+
+% \analogy
+%   {<ratio symbol>}	#1
+%   {<conformity symbol>}		#2
+%   [<term 1>]		#3
+%   [<term 2>]		#4
+%   [<term 3>]		#5
+%   [<term 4>]		#6
+%   [<style>]		#7 d, i, r (display mode (maths), italic or roman)
+\makeatletter
+\NewDocumentCommand{\analogy}{ O{:} O{::} m m m m O{x} }{%
+\yanalogy[#7]{#3}{#4}{#5}{#6}{\@ifmtarg{#1}{:}{#1}}{\@ifmtarg{#2}{::}{#2}}
+}%
+\makeatother
+
+
+% MIgrating from the analogy package (the older one)
+\newcommand{\tabularanalogy}[8]
+{
+  \analogy
+      {\makebox[#1][c]{#5}}
+      {\makebox[#2][c]{#6}}
+      {\makebox[#3][c]{#7}}
+      {\makebox[#4][c]{#8}}
+}
+\newcommand{\tabularanalogyaaaa}[5]
+{
+  \tabularanalogy{#1}{#1}{#1}{#1}{#2}{#3}{#4}{#5}
+}
+\newcommand{\tabularanalogyabab}[6]
+{
+  \tabularanalogy{#1}{#2}{#1}{#2}{#3}{#4}{#5}{#6}
+}
+\newcommand{\tabularanalogyaabb}[6]
+{
+  \tabularanalogy{#1}{#1}{#2}{#2}{#3}{#4}{#5}{#6}
+}
+
+
+% End of analogy style.

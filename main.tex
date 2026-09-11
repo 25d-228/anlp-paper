@@ -1,0 +1,908 @@
+%#!lualatex
+% 言語処理学会年次大会向け原稿（第6次修正版）．LuaLaTeXで組版する．
+% ビルド手順：lualatex main（1回で仕上がる．番号の補助定義は \title の直前を参照）．
+% 参考文献リストは末尾に直接書き込んであるので BibTeX は不要．
+% NLP2027版クラスの公開までは，公式NLP2026クラスを暫定的に使用する．
+% 類推 a:b::c:d の表記には newanalogy.sty（Y. Lepage）の \analogy を用いる．
+\documentclass{nlp2026}
+
+\usepackage[T1]{fontenc}
+\usepackage{amsmath}
+\usepackage{booktabs}
+\usepackage{graphicx}
+\usepackage{url}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning,fit,backgrounds,calc,matrix}
+\usepackage{newanalogy}
+
+% 図表が多いので，1ページに置ける浮動体の量を緩める．
+\renewcommand{\topfraction}{0.94}
+\renewcommand{\bottomfraction}{0.7}
+\renewcommand{\textfraction}{0.05}
+\renewcommand{\floatpagefraction}{0.85}
+\renewcommand{\dbltopfraction}{0.94}
+\renewcommand{\dblfloatpagefraction}{0.85}
+\setcounter{topnumber}{3}
+\setcounter{bottomnumber}{2}
+\setcounter{totalnumber}{5}
+\setcounter{dbltopnumber}{3}
+
+% 図表が多いのでキャプションを1段階小さくする．
+\jlreqsetup{caption_font={\footnotesize}}
+
+% 図表と数式のまわりの空きを詰める（クラス既定より小さくする）．
+\AtBeginDocument{%
+  \setlength{\abovedisplayskip}{4pt plus 2pt minus 2pt}%
+  \setlength{\belowdisplayskip}{4pt plus 2pt minus 2pt}%
+  \setlength{\abovedisplayshortskip}{2pt plus 1pt}%
+  \setlength{\belowdisplayshortskip}{3pt plus 1pt}%
+  \setlength{\floatsep}{5pt plus 2pt minus 2pt}%
+  \setlength{\textfloatsep}{7pt plus 2pt minus 3pt}%
+  \setlength{\intextsep}{5pt plus 2pt minus 2pt}%
+  \setlength{\dblfloatsep}{5pt plus 2pt minus 2pt}%
+  \setlength{\dbltextfloatsep}{7pt plus 2pt minus 3pt}%
+}
+
+%% ---- figmacros ----
+%% perms
+% 図2で用いる4x4置換行列の描画マクロ．
+% \permbox{x位置}{通し番号と類推の形}{注記}{各行で1が立つ列（0始まり）}
+\newcommand{\permcell}{0.30}
+\newcommand{\permbox}[4]{%
+  \begin{scope}[shift={(#1,0)}]
+    \foreach \r in {0,1,2,3}{%
+      \foreach \c in {0,1,2,3}{%
+        \draw[gray!35,line width=0.2pt,fill=blue!4]
+          (\c*\permcell,-\r*\permcell) rectangle ++(\permcell,-\permcell);}}
+    \foreach \c [count=\r from 0] in {#4}{%
+      \fill[blue!65!black] (\c*\permcell,-\r*\permcell) rectangle ++(\permcell,-\permcell);}
+    \draw[gray!60,line width=0.3pt] (0,0) rectangle (4*\permcell,-4*\permcell);
+    \node[font=\scriptsize,inner sep=0pt] at (2*\permcell,0.42) {#2};
+    \node[font=\tiny,inner sep=0pt,gray!55!black] at (2*\permcell,0.17) {#3};
+    \foreach \c [count=\i from 0] in {a,b,c,d}{%
+      \node[font=\tiny,inner sep=0pt] at (\i*\permcell+0.5*\permcell,-4*\permcell-0.14) {$\c$};}
+    \foreach \r in {1,2,3,4}{%
+      \node[font=\tiny,inner sep=0pt] at (-0.17,-\r*\permcell+0.5*\permcell) {\r};}
+  \end{scope}}
+
+%% matrix
+% 図3で用いる補助マクロ．TikZの標準機能だけで括弧と格子を描く．
+% 丸括弧：#1=縦線の位置x，#2=中心y，#3=高さの半分
+\newcommand{\anaLpar}[3]{\draw[line width=.5pt]
+  ({#1+.10},{#2+#3}) .. controls ({#1-.06},{#2+.45*#3})
+  and ({#1-.06},{#2-.45*#3}) .. ({#1+.10},{#2-#3});}
+\newcommand{\anaRpar}[3]{\draw[line width=.5pt]
+  ({#1-.10},{#2+#3}) .. controls ({#1+.06},{#2+.45*#3})
+  and ({#1+.06},{#2-.45*#3}) .. ({#1-.10},{#2-#3});}
+% 4x4混合行列 M_i の格子：#1=左端x，#2=上端y，#3=マスの一辺
+\newcommand{\anaMfour}[3]{%
+  \foreach \i in {0,1,2,3}{\foreach \j in {0,1,2,3}{%
+    \draw[gray!50,line width=.2pt,fill=blue!4]
+      ({#1+\j*#3},{#2-\i*#3}) rectangle ++({#3},{-#3});}}%
+  \foreach \i/\j/\v in {0/1/72,0/2/30,1/0/64,1/3/34,2/2/70,2/1/26,3/3/76,3/0/32}{%
+    \fill[blue!\v!white] ({#1+\j*#3},{#2-\i*#3}) rectangle ++({#3},{-#3});}%
+  \draw[gray!50,line width=.2pt] ({#1},{#2}) rectangle ++({4*#3},{-4*#3});}
+% ブロック対角行列：4スロットのうち3つに M_i を描き，残りは対角の点で示す．
+% #1=左端x，#2=上端y．外枠はブロックの塗りに角を隠されないよう最後に描く．
+\newcommand{\anaBlockDiag}[2]{%
+  \anaMfour{#1}{#2}{0.09688}%
+  \anaMfour{#1+0.3875}{#2-0.3875}{0.09688}%
+  \anaMfour{#1+1.1625}{#2-1.1625}{0.09688}%
+  \node[font=\tiny] at ({#1+0.969},{#2-0.969}) {$\ddots$};%
+  \draw[gray!40,dashed,line width=.3pt] ({#1},{#2}) rectangle ++(1.55,-1.55);}
+% d x d 行列を表す8x8の格子：#1=左端x，#2=上端y
+\newcommand{\anaGridEight}[2]{%
+  \foreach \i in {0,...,7}{\foreach \j in {0,...,7}{%
+    \draw[gray!30,line width=.2pt]
+      ({#1+\j*0.19375},{#2-\i*0.19375}) rectangle ++(0.19375,-0.19375);}}}
+% 行列の積を表す×印：#1=x，#2=y
+\newcommand{\anaTimes}[2]{\node[font=\small,inner sep=0pt] at ({#1},{#2}) {$\times$};}
+
+%% benes
+% 図4（Beneš network）用マクロ．チャネル1本あたりの行間隔．
+\newcommand{\bnrow}{0.26}
+% \bnsw{段内のx位置}{組むチャネルi}{組むチャネルj}：2x2スイッチ1個（縦棒＋両端の端子）
+\newcommand{\bnsw}[3]{%
+  \fill[black!58] ({#1-0.042},{-#2*\bnrow}) rectangle ({#1+0.042},{-#3*\bnrow});
+  \fill[black!80,rounded corners=0.35pt]
+    ({#1-0.088},{-#2*\bnrow-0.052}) rectangle ({#1+0.088},{-#2*\bnrow+0.052});
+  \fill[black!80,rounded corners=0.35pt]
+    ({#1-0.088},{-#3*\bnrow-0.052}) rectangle ({#1+0.088},{-#3*\bnrow+0.052});}
+% \bnbox{x}{y}{0=そのまま,1=入れ替え}：拡大図のスイッチ1個
+\newcommand{\bnbox}[3]{%
+  \draw[black!35,line width=0.3pt] ({#1-0.11},{#2+0.085}) -- ({#1+0.55},{#2+0.085});
+  \draw[black!35,line width=0.3pt] ({#1-0.11},{#2-0.085}) -- ({#1+0.55},{#2-0.085});
+  \draw[black!60,line width=0.4pt,fill=gray!12,rounded corners=0.5pt]
+    ({#1},{#2-0.15}) rectangle ({#1+0.44},{#2+0.15});
+  \ifnum#3=0
+    \draw[black!80,line width=0.5pt] ({#1},{#2+0.085}) -- ({#1+0.44},{#2+0.085});
+    \draw[black!80,line width=0.5pt] ({#1},{#2-0.085}) -- ({#1+0.44},{#2-0.085});
+  \else
+    \draw[black!80,line width=0.5pt] ({#1},{#2+0.085}) -- ({#1+0.44},{#2-0.085});
+    \draw[black!80,line width=0.5pt] ({#1},{#2-0.085}) -- ({#1+0.44},{#2+0.085});
+  \fi}
+
+%% ---- 1回のコンパイルで仕上がるようにするための補助 ----
+% LaTeXは本来，図表・式・節の番号と引用番号を1回目のコンパイルで .aux に書き出し，
+% 2回目で読み込んで本文に入れる．ここでは確定済みの番号を写しておき，.aux がまだ無い
+% 1回目でも同じ番号が入るようにする（.aux があればそちらが優先され，この部分は使われない）．
+% 図表・式・文献の数や順序を変えたときは，2回コンパイルしたあとの main.aux にある
+% \newlabel と \bibcite の行をここに貼り直す．
+\makeatletter
+\AtBeginDocument{%
+  \@ifundefined{r@sec:introduction}{\newlabel{sec:introduction}{{1}{1}{はじめに}{section.1}{}}}{}%
+  \@ifundefined{r@sec:method}{\newlabel{sec:method}{{2}{1}{提案法}{section.2}{}}}{}%
+  \@ifundefined{r@sec:sharing}{\newlabel{sec:sharing}{{2.1}{1}{前提：単純共有と2つの弱点}{subsection.2.1}{}}}{}%
+  \@ifundefined{r@fig:overview}{\newlabel{fig:overview}{{1}{2}{はじめに}{figure.1}{}}}{}%
+  \@ifundefined{r@fig:perms}{\newlabel{fig:perms}{{2}{2}{はじめに}{figure.2}{}}}{}%
+  \@ifundefined{r@fig:matrix}{\newlabel{fig:matrix}{{3}{2}{はじめに}{figure.3}{}}}{}%
+  \@ifundefined{r@fig:benes}{\newlabel{fig:benes}{{4}{2}{はじめに}{figure.4}{}}}{}%
+  \@ifundefined{r@sec:analogy}{\newlabel{sec:analogy}{{2.2}{2}{類推関係を保つ8つの並べ替え}{subsection.2.2}{}}}{}%
+  \@ifundefined{r@sec:local}{\newlabel{sec:local}{{2.3}{2}{局所置換：組の中の混合}{subsection.2.3}{}}}{}%
+  \@ifundefined{r@eq:router}{\newlabel{eq:router}{{1}{2}{局所置換：組の中の混合}{equation.1}{}}}{}%
+  \@ifundefined{r@eq:role}{\newlabel{eq:role}{{2}{2}{局所置換：組の中の混合}{equation.2}{}}}{}%
+  \@ifundefined{r@sec:benes}{\newlabel{sec:benes}{{2.4}{3}{大域置換（Beneš）}{subsection.2.4}{}}}{}%
+  \@ifundefined{r@sec:size}{\newlabel{sec:size}{{3}{3}{モデルの大きさと削減率}{section.3}{}}}{}%
+  \@ifundefined{r@eq:delta}{\newlabel{eq:delta}{{3}{3}{モデルの大きさと削減率}{equation.3}{}}}{}%
+  \@ifundefined{r@sec:experiments}{\newlabel{sec:experiments}{{4}{3}{実験設定}{section.4}{}}}{}%
+  \@ifundefined{r@sec:results}{\newlabel{sec:results}{{5}{3}{結果}{section.5}{}}}{}%
+  \@ifundefined{r@tab:config}{\newlabel{tab:config}{{1}{4}{大域置換（Beneš）}{table.1}{}}}{}%
+  \@ifundefined{r@eq:rate}{\newlabel{eq:rate}{{4}{4}{モデルの大きさと削減率}{equation.4}{}}}{}%
+  \@ifundefined{r@tab:main}{\newlabel{tab:main}{{2}{4}{実験設定}{table.2}{}}}{}%
+  \@ifundefined{r@sec:discussion}{\newlabel{sec:discussion}{{6}{4}{考察とまとめ}{section.6}{}}}{}%
+  \@ifundefined{b@vaswani2017attention}{\bibcite{vaswani2017attention}{1}}{}%
+  \@ifundefined{b@kayyam2026three}{\bibcite{kayyam2026three}{2}}{}%
+  \@ifundefined{b@lepage2025jiaf}{\bibcite{lepage2025jiaf}{3}}{}%
+  \@ifundefined{b@benes1964permutation}{\bibcite{benes1964permutation}{4}}{}%
+  \@ifundefined{b@ainslie2023gqa}{\bibcite{ainslie2023gqa}{5}}{}%
+  \@ifundefined{b@tay2020sparsesinkhorn}{\bibcite{tay2020sparsesinkhorn}{6}}{}%
+  \@ifundefined{b@chen2021permuteformer}{\bibcite{chen2021permuteformer}{7}}{}%
+  \@ifundefined{b@kowsher2025separate}{\bibcite{kowsher2025separate}{8}}{}%
+  \@ifundefined{b@rallier1765proportion}{\bibcite{rallier1765proportion}{9}}{}%
+  \@ifundefined{b@csordas2021devil}{\bibcite{csordas2021devil}{10}}{}%
+  \@ifundefined{b@wu2019payless}{\bibcite{wu2019payless}{11}}{}%
+  \@ifundefined{b@wu2021misconceived}{\bibcite{wu2021misconceived}{12}}{}%
+  \@ifundefined{b@kim2020cogs}{\bibcite{kim2020cogs}{13}}{}%
+  \@ifundefined{b@elliott2016multi30k}{\bibcite{elliott2016multi30k}{14}}{}%
+  \@ifundefined{b@cettolo2014iwslt}{\bibcite{cettolo2014iwslt}{15}}{}%
+  \@ifundefined{b@sennrich2016subword}{\bibcite{sennrich2016subword}{16}}{}%
+  \@ifundefined{b@kudo2018sentencepiece}{\bibcite{kudo2018sentencepiece}{17}}{}%
+  \@ifundefined{b@post2018sacrebleu}{\bibcite{post2018sacrebleu}{18}}{}%
+  \@ifundefined{b@koehn2004statistical}{\bibcite{koehn2004statistical}{19}}{}%
+}
+\makeatother
+
+\title{QKV射影を1枚に共有したTransformerの精度は取り戻せるか}
+
+\author{%
+岳 子然$^{1}$\quad 架田 琉稀$^{2}$\quad ルパージュ イヴ$^{1}$\\
+$^{1}$早稲田大学 大学院情報生産システム研究科\quad $^{2}$旭川工業高等専門学校\\
+\texttt{ron@suou.waseda.jp}, \texttt{p268009@edu.asahikawa-nct.ac.jp},\\
+\texttt{yves.lepage@waseda.jp}}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+Transformerのアテンションは，クエリ$Q$・キー$K$・バリュー$V$を作るために3枚の射影行列
+$W_Q,W_K,W_V$を持つ．これを1枚の$W_S$にまとめると（\textbf{単純共有}），モデル全体の
+パラメータ数を15--36\%減らせるが，$Q,K,V$が互いに似てしまい，翻訳のBLEUが落ちる．本研究は，
+この落ちたBLEUを，削減率をほとんど損なわずに取り戻す手段として類推関係を用いる．類推関係
+\analogy{a}{b}{c}{d}（$a$の$b$に対する関係が$c$の$d$に対する関係に等しい）を保つ操作は，
+4項の並べ替え24通りのうちの8通りと，4項に共通の非負の倍率だけである．$W_S$の出力を
+4チャネルずつの組に切って類推の4項とみなし，この学習パラメータを持たない操作を役割ごとに
+異なる重みで掛けることで，1枚の$W_S$から互いに異なる$Q,K,V$を作り分ける．並べ替える範囲は，
+組の中に限る\textbf{局所置換}と，Beneš networkで$d$チャネル全体へ広げる\textbf{大域置換}の
+2通りを試した．3つのデータセットで検証したところ，局所置換は翻訳において，単純共有が失った
+BLEUの約3分の1を有意に取り戻したが，大域置換はそれを上回らず，COGSでは最低だった．どちらも
+削減率は単純共有とほぼ同じである．
+\end{abstract}
+
+\section{はじめに}
+\label{sec:introduction}
+
+我々の最終的な目標は，類推という一つの数学的な道具で，大規模言語モデルの学習時間・
+パラメータ数・学習データ量を減らすことである．本稿はこのうちパラメータ数を扱う第一段階である．
+
+アテンション1箇所は$W_Q,W_K,W_V,W_O$の4枚の$d\times d$行列を持つ
+\cite{vaswani2017attention}．$W_Q,W_K,W_V$を1枚の$W_S$にまとめると（以下，
+\textbf{単純共有}），1箇所あたり$2d^2-d$個が消え，モデル全体の15--36\%にあたる
+（表\ref{tab:config}）．しかし$Q,K,V$が同じ$S=XW_S$から作られるため互いに似てしまい，
+精度が落ちる．Kayyamら\cite{kayyam2026three}は，完全共有$Q{=}K{=}V$で言語モデルの検証
+perplexityが5.11から6.41（$+25.4\%$）へ悪化することを示した．
+
+落ちた精度を，パラメータ数をほとんど変えずに取り戻したい．そこで類推関係
+\analogy{a}{b}{c}{d}を保つ操作を借りる．4項の並べ方24通りのうち類推を保つのは8通りだけで
+\cite{lepage2025jiaf}，学習パラメータを持たない$4\times4$の置換行列で書ける
+（図\ref{fig:perms}）．4項すべてに同じ非負の倍率を掛けても類推は保たれる．共有射影の出力を
+4チャネルずつの組に切り，役割ごとに8置換の混合と倍率を掛けるのが\textbf{局所置換}である．
+組の外へは動けないという制約を外すため，Beneš network\cite{benes1964permutation}で
+$d$チャネル全体の並べ替えを先に掛けるのが\textbf{大域置換}である．どちらも単純共有から
+出発する提案法の2通りの形であり，本稿では両者を並べて比べる（図\ref{fig:overview}）．
+
+独自性は3点ある．第一に，類推を保つ操作の集合を，$Q,K,V$の役割を作り分ける変換の設計原理
+として用いた研究は我々の知る限りない（ヘッド間の共有\cite{ainslie2023gqa}や系列位置の置換
+\cite{tay2020sparsesinkhorn,chen2021permuteformer}とは対象が異なる）．第二に，対角行列では
+原理的に破れないスコアの対称性を，削減率をほとんど損なわないまま破る．第三に，利得の出どころ
+を，類推由来ではない対照の置換集合との比較で検証する．検証する問いは，（1）同じパラメータ数
+で単純共有を改善するか，（2）同規模の通常Transformerを上回るか，（3）類推由来の8置換は他の
+8置換より有効か，（4）$d$チャネル全体の大域置換は4チャネルの組の中の局所置換を上回るか，
+の4つである．
+
+%% ---- figs ----
+\begin{figure*}[t]
+  \centering
+  \begin{tikzpicture}[x=1cm,y=1cm,font=\scriptsize,
+    pane/.style={draw=gray!35,fill=gray!5,rounded corners=2.5pt,line width=0.3pt},
+    hd/.style={anchor=north,align=center,font=\footnotesize},
+    io/.style={inner sep=0.6pt,font=\scriptsize},
+    wbox/.style={draw=blue!55!black,fill=blue!12,rounded corners=1.2pt,inner sep=0pt,
+                 minimum width=6.6mm,minimum height=4.2mm,font=\scriptsize},
+    ubox/.style={draw=blue!45!black,fill=blue!5,rounded corners=1.5pt,inner sep=0pt,
+                 minimum height=4.5mm,anchor=west},
+    fl/.style={-{Stealth[length=1.3mm,width=1.1mm]},draw=gray!60!black,line width=0.3pt},
+    big/.style={-{Stealth[length=2.2mm,width=2mm]},draw=blue!45!black,line width=1pt},
+    nt/.style={font=\tiny,align=center,text=black!72},
+    tg/.style={font=\tiny,align=center,text=blue!45!black},
+    %
+    pics/mmat/.style={code={
+      \foreach \r/\va/\vb/\vc/\vd in {0/14/58/14/12,1/56/16/12/14,2/12/14/16/56,3/14/12/58/16}{
+        \draw[gray!45,line width=0.15pt,fill=blue!\va] (-0.170,0.170-\r*0.085) rectangle ++(0.085,-0.085);
+        \draw[gray!45,line width=0.15pt,fill=blue!\vb] (-0.085,0.170-\r*0.085) rectangle ++(0.085,-0.085);
+        \draw[gray!45,line width=0.15pt,fill=blue!\vc] (0.000,0.170-\r*0.085) rectangle ++(0.085,-0.085);
+        \draw[gray!45,line width=0.15pt,fill=blue!\vd] (0.085,0.170-\r*0.085) rectangle ++(0.085,-0.085);}}},
+    pics/dbar/.style={code={
+      \draw[gray!55,fill=blue!14,line width=0.25pt] (-0.06,-0.19) rectangle (0.06,0.19);
+      \foreach \i in {0,1,2,3}{\fill[blue!60!black] (0,0.14-\i*0.093) circle (0.023);}}},
+    pics/zstrip/.style={code={
+      \foreach \i in {0,1,2,3}{
+        \draw[gray!60,fill=blue!16,line width=0.2pt] (-0.07,0.385-\i*0.085) rectangle ++(0.14,-0.085);
+        \draw[gray!60,fill=blue!16,line width=0.2pt] (-0.07,-0.045-\i*0.085) rectangle ++(0.14,-0.085);}}},
+    pics/wires/.style={code={
+      \foreach \i in {0,1,2,3}{\fill[blue!55!black] (-0.19,0.128-\i*0.085) circle (0.018);
+                               \fill[blue!55!black] (0.19,0.128-\i*0.085) circle (0.018);}
+      \draw[blue!50!black,line width=0.3pt] (-0.19,0.128) -- (0.19,-0.042);
+      \draw[blue!50!black,line width=0.3pt] (-0.19,0.043) -- (0.19,0.128);
+      \draw[blue!50!black,line width=0.3pt] (-0.19,-0.042) -- (0.19,-0.127);
+      \draw[blue!50!black,line width=0.3pt] (-0.19,-0.127) -- (0.19,0.043);}},
+    ]
+
+  %% ---- 各段階の枠と見出し ----
+  \draw[pane] (0,-1.18) rectangle (2.00,1.42);
+  \draw[pane] (2.90,-1.18) rectangle (6.05,1.42);
+  \draw[pane] (6.95,-1.18) rectangle (11.15,1.42);
+  \draw[pane] (12.05,-1.18) rectangle (16.55,1.42);
+  \node[hd] at (1.000,1.38) {(a) 標準};
+  \node[hd] at (4.475,1.38) {(b) 単純共有};
+  \node[hd] at (9.050,1.38) {(c) 提案：局所置換};
+  \node[hd] at (14.30,1.38) {(d) 提案：大域置換（Beneš）};
+
+  %% ---- (a) 標準 ----
+  \node[io] at (0.20,0.08) {$x$};
+  \node[wbox] (aq) at (1.05,0.58) {$W_Q$};
+  \node[wbox] (ak) at (1.05,0.08) {$W_K$};
+  \node[wbox] (av) at (1.05,-0.42) {$W_V$};
+  \foreach \n in {aq,ak,av}{\draw[fl] (0.34,0.08) -- (\n.west);}
+  \foreach \n/\l/\y in {aq/Q/0.58,ak/K/0.08,av/V/-0.42}{
+    \draw[fl] (\n.east) -- (1.66,\y);
+    \node[io] at (1.78,\y) {$\l$};}
+  \node[nt] at (1.00,-0.80) {$3(d^2{+}d)$個};
+  \node[nt] at (1.00,-1.03) {役割ごとに別の行列};
+
+  %% ---- (b) 単純共有 ----
+  \node[io] at (3.07,0.08) {$x$};
+  \node[wbox] (bs) at (3.85,0.08) {$W_S$};
+  \draw[fl] (3.20,0.08) -- (bs.west);
+  \draw[fl] (bs.east) -- (4.36,0.08);
+  \node[io] at (4.48,0.08) {$z$};
+  \foreach \y in {0.58,0.08,-0.42}{
+    \draw[fl] (4.60,0.08) -- (4.86,\y);
+    \pic at (4.95,\y) {dbar};
+    \draw[fl] (5.51,\y) -- (5.71,\y);}
+  \node[io] at (5.27,0.58) {$D_Q$};
+  \node[io] at (5.27,0.08) {$D_K$};
+  \node[io] at (5.27,-0.42) {$D_V$};
+  \node[io] at (5.83,0.58) {$Q$};
+  \node[io] at (5.83,0.08) {$K$};
+  \node[io] at (5.83,-0.42) {$V$};
+  \node[nt] at (4.475,-0.80) {$d^2{+}4d$個};
+  \node[nt] at (4.475,-1.03) {$QK^\top$ は必ず対称};
+
+  %% ---- (c) 局所置換：4チャネルずつの組の中で混ぜる ----
+  \node[io] at (7.10,0.08) {$x$};
+  \node[wbox] (cs) at (7.85,0.08) {$W_S$};
+  \draw[fl] (7.22,0.08) -- (cs.west);
+  \draw[fl] (cs.east) -- (8.30,0.08);
+  \node[io] at (8.42,0.08) {$z$};
+  \draw[fl] (8.55,0.08) -- (8.69,0.08);
+  \pic at (8.78,0.08) {zstrip};
+  \foreach \y/\r in {0.58/Q,0.08/K,-0.42/V}{
+    \draw[fl] (8.87,0.08) -- (9.04,\y);
+    \node[ubox,minimum width=13.8mm] at (9.06,\y) {};
+    \pic at (9.31,\y) {mmat};
+    \node[font=\tiny] at (9.98,\y) {$\lambda_\r M_\r$};
+    \draw[fl] (10.44,\y) -- (10.66,\y);
+    \node[io] at (10.78,\y) {$\r$};}
+  \node[nt] at (9.05,-0.80) {$+3(9d+10)$個／箇所};
+  \node[nt] at (9.05,-1.03) {組の外へは動けない};
+
+  %% ---- (d) 大域置換：Beneš の置換を先に掛ける ----
+  \node[io] at (12.22,0.08) {$x$};
+  \node[wbox] (ds) at (12.98,0.08) {$W_S$};
+  \draw[fl] (12.35,0.08) -- (ds.west);
+  \draw[fl] (ds.east) -- (13.44,0.08);
+  \node[io] at (13.56,0.08) {$z$};
+  \foreach \y/\r in {0.08/K,-0.42/V}{
+    \draw[fl] (13.68,0.08) -- (13.84,\y);
+    \node[ubox,minimum width=9.6mm] at (13.86,\y) {};
+    \node[font=\tiny] at (14.10,\y) {$\Pi_\r$};
+    \pic at (14.54,\y) {wires};
+    \draw[fl] (14.84,\y) -- (14.98,\y);}
+  \draw[fl] (13.68,0.08) -- (13.84,0.58) -- (14.98,0.58);
+  \node[nt,anchor=south] at (14.41,0.63) {置換なし};
+  \foreach \y/\r in {0.58/Q,0.08/K,-0.42/V}{
+    \node[ubox,minimum width=10mm] at (15.00,\y) {};
+    \pic at (15.25,\y) {mmat};
+    \node[font=\tiny] at (15.76,\y) {$M_\r$};
+    \draw[fl] (16.00,\y) -- (16.22,\y);
+    \node[io] at (16.35,\y) {$\r$};}
+  \node[nt] at (14.30,-0.80) {$+3(8d+9)+d(2\log_2 d-1)$個／箇所};
+  \node[nt] at (14.30,-1.03) {どのチャネルもどこへでも動ける};
+
+  %% ---- 段階のあいだの関係 ----
+  \draw[big] (2.14,0.08) -- (2.76,0.08);
+  \node[tg] at (2.45,0.40) {減らす};
+  \draw[big] (6.19,0.08) -- (6.81,0.08);
+  \node[tg] at (6.50,0.40) {取り戻す};
+  \node[tg] at (11.60,0.08) {または};
+  \end{tikzpicture}
+  \caption{アテンション1箇所の射影の変化．(b) 単純共有は役割別の対角行列$D_r$（対角成分だけを
+  縦に並べて描いた）しか持たないので$QK^\top$が必ず対称になる．(c) 局所置換は$z$を4チャネル
+  ずつの組に切り，役割$r$ごとのルータが8置換を混ぜた$M_r$（格子の濃さが重み）と倍率
+  $\lambda_r$を掛ける．(d) 大域置換は$K,V$に$\Pi_K,\Pi_V$を先に掛け，倍率は使わない．
+  (c)と(d)は(b)から出発した並列の2案である．}
+  \label{fig:overview}
+\end{figure*}
+
+\begin{figure*}[t]
+  \centering
+  \begin{tikzpicture}[x=1cm,y=1cm]
+    \permbox{0}{1.\,\analogy{a}{b}{c}{d}}{恒等}{0,1,2,3}
+    \permbox{1.86}{2.\,\analogy{a}{c}{b}{d}}{内項交換}{0,2,1,3}
+    \permbox{3.72}{3.\,\analogy{d}{c}{b}{a}}{}{3,2,1,0}
+    \permbox{5.58}{4.\,\analogy{c}{a}{d}{b}}{}{2,0,3,1}
+    \permbox{7.44}{5.\,\analogy{b}{a}{d}{c}}{比の逆転}{1,0,3,2}
+    \permbox{9.30}{6.\,\analogy{b}{d}{a}{c}}{}{1,3,0,2}
+    \permbox{11.16}{7.\,\analogy{c}{d}{a}{b}}{対称}{2,3,0,1}
+    \permbox{13.02}{8.\,\analogy{d}{b}{c}{a}}{}{3,1,2,0}
+    \node[font=\scriptsize,anchor=west,align=left,inner xsep=4pt,inner ysep=3pt,
+          fill=gray!8,rounded corners=1.5pt]
+      at (14.48,-0.60)
+      {例：$\analogy{1}{2}{4}{8}$\\[1pt]
+       $\longrightarrow\ \analogy{1}{4}{2}{8}$\\[1pt]
+       （$P_2$，内項交換）};
+  \end{tikzpicture}
+  \caption{類推関係\analogy{a}{b}{c}{d}を保つ8通りの並べ替えを表す$4\times4$置換行列
+  $P_1,\ldots,P_8$（位数8の二面体群$D_8$）．列は入力位置$a,b,c,d$，行は出力位置1--4，
+  塗りが1．24通りのうち外項$\{a,d\}$と内項$\{b,c\}$への分割を保つのはこの8通りだけである．}
+  \label{fig:perms}
+\end{figure*}
+
+\begin{figure*}[t]
+  \centering
+  \begin{tikzpicture}[x=1cm,y=1cm,font=\tiny]
+    % ===================== 左：局所置換 =====================
+    % z_r = M × I × z．行列は右端の z に近いものから順に掛かる（①並べ替え → ②組の中の混合）．
+    \begin{scope}
+      \node[anchor=north west,font=\footnotesize] at (-0.15,0.30)
+        {\textbf{局所置換}（大域置換なし）};
+      \node[anchor=east,font=\scriptsize] at (0.60,-1.425) {$z_r=$};
+      % ブロック対角行列
+      \anaBlockDiag{0.74}{-0.65}
+      \anaLpar{0.62}{-1.425}{0.85}
+      \anaRpar{2.41}{-1.425}{0.85}
+      \node[anchor=south,inner sep=1pt] at (1.515,-0.41)
+        {$\lambda_1M_1,\dots,\lambda_{d/4}M_{d/4}$};
+      % 行列の積
+      \anaTimes{2.64}{-1.425}
+      % 大域置換を持たない＝恒等
+      \draw[gray!55,dashed,line width=.5pt,rounded corners=2pt]
+        (2.84,-0.52) rectangle ++(1.95,-1.81);
+      \anaGridEight{3.04}{-0.65}
+      \foreach \i in {0,...,7}{%
+        \fill[gray!50] ({3.04+\i*0.19375},{-0.65-\i*0.19375})
+          rectangle ++(0.19375,-0.19375);}
+      \anaLpar{2.92}{-1.425}{0.85}
+      \anaRpar{4.71}{-1.425}{0.85}
+      \node[anchor=south,inner sep=1pt,text=gray!60!black] at (3.815,-0.37)
+        {恒等 $I$};
+      % 行列とベクトルの積
+      \anaTimes{4.96}{-1.425}
+      % 入力ベクトル
+      \anaLpar{5.14}{-1.425}{0.85}
+      \node[font=\scriptsize,inner sep=1pt] at (5.42,-0.95) {$z_1$};
+      \node[font=\scriptsize,inner sep=1pt] at (5.42,-1.43) {$\vdots$};
+      \node[font=\scriptsize,inner sep=1pt] at (5.42,-1.92) {$z_d$};
+      \anaRpar{5.70}{-1.425}{0.85}
+      % 掛かる順：入力 z（右端）→ ① → ② → 出力 z_r（左端）
+      \node[inner sep=1pt] (in) at (5.42,-2.60) {入力 $z$};
+      \node[inner sep=1pt] (out) at (0.32,-2.60) {出力 $z_r$};
+      \node[inner xsep=2pt,inner ysep=1pt,text=gray!60!black] (s1) at (3.815,-2.60)
+        {①並べ替えなし};
+      \node[inner xsep=2pt,inner ysep=1pt] (s2) at (1.515,-2.60) {②組の中の混合};
+      \draw[-{Stealth[length=1.5mm,width=1.2mm]},gray!50!black,line width=0.45pt]
+        (in.west) -- (s1.east);
+      \draw[-{Stealth[length=1.5mm,width=1.2mm]},gray!50!black,line width=0.45pt]
+        (s1.west) -- (s2.east);
+      \draw[-{Stealth[length=1.5mm,width=1.2mm]},gray!50!black,line width=0.45pt]
+        (s2.west) -- (out.east);
+      % 注記
+      \node[anchor=north west,align=left,text width=2.32cm,inner sep=0pt]
+        at (5.88,-0.55)
+        {{\scriptsize 同じ組の4チャネルの\textbf{中でしか}混ざらない．\par}%
+         \vspace{2.5pt}%
+         {\tiny\linespread{1.14}\selectfont
+          $M_i$ は類推を保つ8個の $4\times4$ 置換行列 $P_1,\dots,P_8$ の重み付き平均
+          （重みは和が1で，トークンごとに変わる），$\lambda_i$ は非負の倍率．\par}};
+    \end{scope}
+
+    % ===================== 仕切り =====================
+    \draw[gray!45,line width=.3pt] (8.29,0.32) -- (8.29,-2.78);
+
+    % ===================== 右：大域置換（Beneš） =====================
+    % z_r = M × Π_r × z．z にまず Π_r が掛かり（①），次に組の中の混合（②）．
+    \begin{scope}[shift={(8.62,0)}]
+      \node[anchor=north west,font=\footnotesize] at (-0.15,0.30)
+        {\textbf{大域置換}（Bene\v{s} の $\Pi_r$ を先に掛ける）};
+      \node[anchor=east,font=\scriptsize] at (0.60,-1.425) {$z_r=$};
+      % ブロック対角行列（この変種は倍率を持たない）
+      \anaBlockDiag{0.74}{-0.65}
+      \anaLpar{0.62}{-1.425}{0.85}
+      \anaRpar{2.41}{-1.425}{0.85}
+      \node[anchor=south,inner sep=1pt] at (1.515,-0.41) {$M_1,\dots,M_{d/4}$};
+      % 行列の積
+      \anaTimes{2.64}{-1.425}
+      % Beneš network が作る大域置換 Pi_r
+      \draw[orange!80!black,line width=.9pt,rounded corners=2pt,fill=orange!6]
+        (2.84,-0.52) rectangle ++(1.95,-1.81);
+      \anaGridEight{3.04}{-0.65}
+      \foreach \i/\j in {0/3,1/6,2/0,3/5,4/1,5/7,6/2,7/4}{%
+        \fill[orange!80!black] ({3.04+\j*0.19375},{-0.65-\i*0.19375})
+          rectangle ++(0.19375,-0.19375);}
+      \anaLpar{2.92}{-1.425}{0.85}
+      \anaRpar{4.71}{-1.425}{0.85}
+      \node[anchor=south,inner sep=1pt,text=orange!70!black] at (3.815,-0.37)
+        {$\Pi_r$：各行・各列に1が1個};
+      % 行列とベクトルの積
+      \anaTimes{4.96}{-1.425}
+      % 入力ベクトル
+      \anaLpar{5.14}{-1.425}{0.85}
+      \node[font=\scriptsize,inner sep=1pt] at (5.42,-0.95) {$z_1$};
+      \node[font=\scriptsize,inner sep=1pt] at (5.42,-1.43) {$\vdots$};
+      \node[font=\scriptsize,inner sep=1pt] at (5.42,-1.92) {$z_d$};
+      \anaRpar{5.70}{-1.425}{0.85}
+      % 掛かる順：入力 z（右端）→ ① Π_r → ② M → 出力 z_r（左端）
+      \node[inner sep=1pt] (in) at (5.42,-2.60) {入力 $z$};
+      \node[inner sep=1pt] (out) at (0.32,-2.60) {出力 $z_r$};
+      \node[inner xsep=2pt,inner ysep=1pt,text=orange!70!black] (s1) at (3.815,-2.60)
+        {①$\Pi_r$で並べ替え};
+      \node[inner xsep=2pt,inner ysep=1pt] (s2) at (1.515,-2.60) {②組の中の混合};
+      \draw[-{Stealth[length=1.5mm,width=1.2mm]},gray!50!black,line width=0.45pt]
+        (in.west) -- (s1.east);
+      \draw[-{Stealth[length=1.5mm,width=1.2mm]},gray!50!black,line width=0.45pt]
+        (s1.west) -- (s2.east);
+      \draw[-{Stealth[length=1.5mm,width=1.2mm]},gray!50!black,line width=0.45pt]
+        (s2.west) -- (out.east);
+      % 注記
+      \node[anchor=north west,align=left,text width=2.32cm,inner sep=0pt]
+        at (5.88,-0.55)
+        {{\scriptsize \textbf{どの}4チャネルの組でも作れる．\par}%
+         \vspace{2.5pt}%
+         {\tiny\linespread{1.14}\selectfont
+          $\Pi_r$ は学習されるが，持つのは $d\times d$ 個の数ではなく
+          $\frac{d}{2}(2\log_2 d-1)$ 個の0/1スイッチだけ
+          （$d{=}512$ なら4{,}352個＝密行列の1.66\%）．\par}};
+    \end{scope}
+  \end{tikzpicture}
+  \caption{共有射影の出力$z$から役割別の$z_r$を作る線形部分（ゲート$g_r$と対角$d_r$は省略，
+  $\times$は行列の積）．下の矢印が掛かる順で，右端の入力$z$にまず①，次に②が掛かって左端の
+  出力$z_r$になる．大域置換では①で$\Pi_r$（$r\in\{K,V\}$）により並べ替えるので，離れたチャネル
+  も同じ組に入れられる．}
+  \label{fig:matrix}
+\end{figure*}
+
+\begin{figure}[tb]
+  \centering
+  \begin{tikzpicture}[x=1cm,y=1cm]
+    \foreach \c in {0,...,7}{
+      \draw[black!35,line width=0.3pt] (-0.46,{-\c*\bnrow}) -- (3.72,{-\c*\bnrow});
+      \node[anchor=east,font=\tiny,inner sep=1pt] at (-0.49,{-\c*\bnrow}) {$x_{\c}$};
+      \node[anchor=west,font=\tiny,inner sep=1pt] at (3.75,{-\c*\bnrow}) {$y_{\c}$};}
+    \begin{scope}[on background layer]
+      \foreach \a/\b in {-0.17/0.17, 0.27/0.91, 1.01/2.25, 2.35/2.99, 3.09/3.43}{
+        \fill[gray!10,rounded corners=1pt] (\a,0.17) rectangle (\b,{-7*\bnrow-0.17});}
+    \end{scope}
+    \bnsw{0.00}{0}{1}\bnsw{0.00}{2}{3}\bnsw{0.00}{4}{5}\bnsw{0.00}{6}{7}
+    \bnsw{0.44}{0}{2}\bnsw{0.44}{4}{6}\bnsw{0.74}{1}{3}\bnsw{0.74}{5}{7}
+    \bnsw{1.18}{0}{4}\bnsw{1.48}{1}{5}\bnsw{1.78}{2}{6}\bnsw{2.08}{3}{7}
+    \bnsw{2.52}{0}{2}\bnsw{2.52}{4}{6}\bnsw{2.82}{1}{3}\bnsw{2.82}{5}{7}
+    \bnsw{3.26}{0}{1}\bnsw{3.26}{2}{3}\bnsw{3.26}{4}{5}\bnsw{3.26}{6}{7}
+    \foreach \x/\s in {0.00/1, 0.59/2, 1.63/4, 2.67/2, 3.26/1}{
+      \node[font=\tiny,inner sep=1pt] at (\x,0.33) {$\s$};}
+    \node[font=\tiny,anchor=east,inner sep=1pt] at (-0.49,0.33) {組む間隔};
+    \node[font=\tiny,inner sep=0pt] at (5.64,0.32) {スイッチ1個の動作};
+    \node[font=\tiny,anchor=east,inner sep=1pt] at (5.06,-0.21) {$a$};
+    \node[font=\tiny,anchor=east,inner sep=1pt] at (5.06,-0.39) {$b$};
+    \bnbox{5.20}{-0.30}{0}
+    \node[font=\tiny,anchor=west,inner sep=1pt] at (5.78,-0.30) {$(a,b)$};
+    \node[font=\tiny,anchor=north,inner sep=1pt] at (5.64,-0.54) {そのまま};
+    \node[font=\tiny,anchor=east,inner sep=1pt] at (5.06,-1.11) {$a$};
+    \node[font=\tiny,anchor=east,inner sep=1pt] at (5.06,-1.29) {$b$};
+    \bnbox{5.20}{-1.20}{1}
+    \node[font=\tiny,anchor=west,inner sep=1pt] at (5.78,-1.20) {$(b,a)$};
+    \node[font=\tiny,anchor=north,inner sep=1pt] at (5.64,-1.44) {入れ替え};
+  \end{tikzpicture}
+  \caption{Beneš networkで表す大域置換$\Pi_K,\Pi_V$（$d{=}8$の例）．濃い縦棒1本が$2\times2$
+  スイッチ1個で，つないだ2チャネルを入れ替えるかどうかを1ビットで選ぶ．$(2\log_2 d-1)$段・
+  各段$d/2$個で$d!$通りすべての置換を表せる（$d{=}512$なら4,352個＝密な$d\times d$行列の
+  1.66\%）．}
+  \label{fig:benes}
+\end{figure}
+
+\section{提案法}
+\label{sec:method}
+
+\subsection{前提：単純共有と2つの弱点}
+\label{sec:sharing}
+
+出発点は，1枚の射影行列$W_S$と，役割ごとに異なる対角行列$D_Q,D_K,D_V$を用いる共有重み
+アテンション\cite{kowsher2025separate}，すなわち第\ref{sec:introduction}節の
+\textbf{単純共有}である（図\ref{fig:overview}(b)）：
+$S=XW_S+b_S$，$(Q,K,V)=(SD_Q,SD_K,SD_V)$．弱点は2つある．\textbf{チャネル間で混ぜられない}：
+対角行列は各チャネルを個別に定数倍するだけで，異なるチャネルの情報を組み合わせられない．
+\textbf{対称}：$D_QD_K$は対角なのでスコア$QK^\top=SD_QD_KS^\top$は必ず対称になり，
+単語$i$が$j$を見る強さと$j$が$i$を見る強さが常に等しいので，言語の「向き」を表せない．
+
+\subsection{類推関係を保つ8つの並べ替え}
+\label{sec:analogy}
+
+類推\analogy{a}{b}{c}{d}は，対称\analogy{c}{d}{a}{b}，内項交換\analogy{a}{c}{b}{d}，
+比の逆転\analogy{b}{a}{d}{c}のいずれによっても同じ類推を表す．これらが生成する入れ替えは
+18世紀の百科全書\cite{rallier1765proportion}以来の8通りで，位数8の二面体群$D_8$をなす
+\cite{lepage2025jiaf}（図\ref{fig:perms}）．4項に同じ非負の倍率$\lambda\ge0$を掛けても類推は
+保たれる．本稿が借りるのはこの2操作だけであり，以下では2操作の下で保たれる
+\analogy{a}{b}{c}{d}を\textbf{類推関係}と呼ぶ．
+
+\subsection{局所置換：組の中の混合}
+\label{sec:local}
+
+$z=xW_S+b_S$を4チャネルずつの組に切り，各組を類推の4項とみなす．
+役割$r\in\{Q,K,V\}$ごとに，文脈ベクトル$u$から8つの置換の混合重みを計算する小さな線形層
+（以下，\textbf{ルータ}と呼ぶ）を置く：
+\begin{equation}
+ p_r(u)=\operatorname{softmax}(R_ru+b_r),\quad
+ M_r(u)=\sum_{c=1}^{8}p_{r,c}(u)P_c.
+ \label{eq:router}
+\end{equation}
+$M_r(u)$は各行と各列の和がともに1になる行列（二重確率行列）であり，組の値を平均に近づける
+ことしかできない．そこで大きさを戻す非負の倍率$\lambda_r(u)$と，変換後の値と元の$z$を
+どの割合で混ぜるかを決めるゲート$g_r\in[0,1]$を置き，役割変換を
+\begin{equation}
+ T_r(z;u)=d_r\odot\bigl[z+g_r\{\lambda_r(u)M_r(u)z-z\}\bigr]
+ \label{eq:role}
+\end{equation}
+とする．$d_r$は単純共有から引き継ぐ対角である．$g_r\to0$で単純共有に帰着するので，提案モデル
+は単純共有を特殊な場合として含む．組の作り方とルータの入力$u$を変えた5つの変種を
+表\ref{tab:main}に示す．このうち\textbf{トークン別}（1トークン内の
+連続する4チャネルを1組とし，そのトークンのベクトル全体を$u$とする）だけは系列位置ごとに
+独立に計算できるのでデコーダにも置け，全アテンションに置いたものを\textbf{全箇所}と呼ぶ．
+
+\subsection{大域置換（Beneš）}
+\label{sec:benes}
+
+式(\ref{eq:role})の$M_r(u)$は$4\times4$なので，全体としては$4\times4$のブロックが対角に並んだ
+$d\times d$行列を掛けており，たとえば1番目のチャネルの値は1--4番目のチャネルの位置にしか
+移れない（図\ref{fig:matrix}左）．$d\times d$の置換行列を直接学習させようにも候補は$d!$通り
+（$d=128$でも$10^{215}$超）あってsoftmaxでは選べない．
+
+そこでBeneš network~\cite{benes1964permutation}を用いる．2本の線を「入れ替える／入れ替え
+ない」だけの$2\times2$スイッチを段状に並べた回路で，$\frac{d}{2}(2\log_2 d-1)$個のスイッチ
+だけで$d!$通りすべての置換を表せる（図\ref{fig:benes}）．実装では各スイッチを1個の実数で
+持ち，順伝播ではその符号で入れ替えの有無を決めて厳密な置換を適用し，逆伝播ではsigmoid関数で
+近似した勾配を流す．$Q$には置換を掛けず，$K$と$V$にそれぞれ独立な静的置換$\Pi_K,\Pi_V$を
+掛けてから，第\ref{sec:local}節と同じ組の中の混合を行う：$K=T_K(\Pi_K z;u)$，
+$V=T_V(\Pi_V z;u)$（図\ref{fig:matrix}右）．$Q$に置換を掛けないのは，$Q$だけならば
+$W_S$を$W_S\Pi_Q^\top$と置き直せば同じことになり，新しい自由度にならないからである．
+3つの役割が$W_S$を共有しているので，$Q$を並び順の基準に固定したうえでの$\Pi_K,\Pi_V$だけが
+実際の自由度になる．なおこの変種は倍率を持たない（$\lambda_r\equiv1$）．
+
+\paragraph{なぜ対称性が破れるか}
+$Q=SA_Q$，$K=SA_K$と書くと$QK^\top=SA_QA_K^\top S^\top$であり，中央の$A_QA_K^\top$が
+対称でなければスコアは対称でない．対角行列の積は必ず対称だが，置換行列の積はそうでは
+ない（たとえば$P_2P_5^\top=P_6$は対称でない）．提案法は役割ごとに異なるルータと大域置換
+を持つので非対称なスコアを表現でき，第\ref{sec:sharing}節の2つの弱点を同時に解消できる，
+というのが本稿の仮説である．
+
+%% ---- tab_config ----
+\begin{table*}[t]
+  \centering
+  \scriptsize
+  \setlength{\tabcolsep}{3pt}
+  \caption{モデル構成，標準モデルの部品別パラメータ数（括弧内は\%），射影共有で消える数
+  $\Delta P$（式(\ref{eq:delta})）と削減率（式(\ref{eq:rate})）．構成がデータセットごとに
+  違うのは，そのデータセットで公表されている数値が報告されたときの構成をそのまま用いた
+  ためである．}
+  \label{tab:config}
+  \begin{tabular}{lrrrrrrr@{\hspace{7pt}}rrrrr@{\hspace{7pt}}rr}
+    \toprule
+    & \multicolumn{7}{c}{モデル構成} & \multicolumn{5}{c}{標準モデルの部品別パラメータ数}
+      & \multicolumn{2}{c}{射影共有} \\
+    \cmidrule(r){2-8}\cmidrule(lr){9-13}\cmidrule(l){14-15}
+    データセット & $d$ & $f$ & $L_e$ & $L_d$ & ヘッド & $V$ & $L_e{+}2L_d$
+      & 埋め込み$\,Vd$ & アテンション & FFN & LayerNorm & 合計
+      & $\Delta P$ & 削減率 \\
+    \midrule
+    COGS     & 512 & 512     & 2 & 2 & 8 & 835      & 6
+      & 0.43M\,(\phantom{0}4.8)  & \phantom{0}6.30M\,(71.3)  & \phantom{0}2.10M\,(23.8)
+      & 0.01M\,(0.1) & \phantom{0}8.84M & 3.14M & 35.53\% \\
+    IWSLT14  & 512 & 1{,}024 & 6 & 6 & 4 & 10{,}000 & 18
+      & 5.12M\,(14.0) & 18.91M\,(51.6) & 12.60M\,(34.4)
+      & 0.03M\,(0.1) & 36.67M & 9.43M & 25.71\% \\
+    Multi30k & 128 & 256     & 4 & 4 & 4 & 10{,}000 & 12
+      & 1.28M\,(49.1) & \phantom{0}0.79M\,(30.4)  & \phantom{0}0.53M\,(20.2)
+      & 0.01M\,(0.2) & \phantom{0}2.61M & 0.39M & 15.03\% \\
+    \bottomrule
+  \end{tabular}
+\end{table*}
+
+\section{モデルの大きさと削減率}
+\label{sec:size}
+
+記号は，$d$がモデル次元，$f$がFFN中間層の次元，$L_e$がエンコーダ層数，$L_d$がデコーダ層数，
+$V$が語彙サイズである．アテンションはエンコーダの自己アテンションが$L_e$箇所，デコーダの
+自己アテンションと交差アテンションが$L_d$箇所ずつあるので合計$L_e+2L_d$箇所，FFNは各層に
+1個ずつなので$L_e+L_d$個である．バイアスとLayerNormも含めて数えると，モデル全体は
+式(\ref{eq:rate})の分母の4項の和になる．3枚を1枚にすると1箇所あたり$3(d^2+d)$が$(d^2+d)$に
+なり，かわりに対角3本$3d$が増えるので，消えるのは
+\begin{equation}
+ \Delta P=(L_e+2L_d)\bigl\{2(d^2+d)-3d\bigr\}=(L_e+2L_d)(2d^2-d)
+ \label{eq:delta}
+\end{equation}
+%% ---- eq_rate ----
+\begin{figure*}[t]
+\begin{equation}
+ \text{削減率}=\frac{\Delta P}{\text{合計}}
+  =\frac{(L_e+2L_d)\,(2d^{2}-d)}
+        {\underbrace{Vd}_{\text{埋め込み}}
+         \;+\;\underbrace{4(d^{2}+d)(L_e+2L_d)}_{\text{アテンション}}
+         \;+\;\underbrace{(2df+f+d)(L_e+L_d)}_{\text{FFN}}
+         \;+\;\underbrace{2d(2L_e+3L_d+2)}_{\text{LayerNorm}}}
+ \label{eq:rate}
+\end{equation}
+\end{figure*}%
+である．本稿で削減率と呼ぶその割合を約めずに書けば式(\ref{eq:rate})になる（表\ref{tab:config}）．
+バイアスとLayerNormを無視すれば，削減率はアテンションが全体に占める割合のちょうど半分である
+（表\ref{tab:config}のIWSLT14でも51.6\%に対し25.71\%）．
+
+表\ref{tab:config}の構成がデータセットごとに違うのは，同じTransformerであっても，データ
+セットごとに，そのデータセットで公表されている数値が報告されたときの構成（$d$，$f$，層数，
+ヘッド数）をそのまま用いたためである．学習設定も同じ出典
+\cite{csordas2021devil,wu2019payless,wu2021misconceived}に合わせ，全モデルで共通にした．
+
+提案法が使うパラメータは1箇所あたり局所置換が最大$3(9d+10)$個，大域置換が
+$3(8d+9)+d(2\log_2 d-1)$個で，全アテンション箇所の分を合計しても単純共有の2\%以内なので，
+削減率はほとんど変わらない（表\ref{tab:main}）．
+
+\section{実験設定}
+\label{sec:experiments}
+
+通常のTransformer（\textbf{標準}），単純共有とパラメータ数がほぼ揃うようにモデル次元$d$と
+FFN次元$f$を狭めた通常のTransformer（\textbf{同規模標準}），\textbf{単純共有}，局所置換の
+5変種，\textbf{大域置換}（Beneš）を，表\ref{tab:config}の構成で比較する．COGS意味解析
+\cite{kim2020cogs}（24,155件）は構成的汎化を測る評価用分割での完全一致率，
+Multi30k英$\rightarrow$独\cite{elliott2016multi30k}（29,000件）とIWSLT14
+独$\rightarrow$英\cite{cettolo2014iwslt}（160,239件）は両言語共有の10,000ユニットBPE語彙
+\cite{sennrich2016subword,kudo2018sentencepiece}でBLEU/13a~\cite{post2018sacrebleu}を測る．
+デコードはビーム幅5，差は対応ありブートストラップ\cite{koehn2004statistical}で検定する
+（多重比較は補正しない）．
+
+%% ---- tab_main ----
+\begin{table*}[t]
+  \centering
+  \footnotesize
+  \setlength{\tabcolsep}{5pt}
+  \renewcommand{\arraystretch}{0.9}
+  \caption{主結果と削減率．「削減」は標準（8.84M／36.67M／2.61M）に対して取り除いた割合．
+  $\pm$はCOGSの上位8行が5回の学習の標準偏差，他は評価事例を再抽出するブートストラップ95\%
+  信頼区間の半幅（異なる量）．太字は局所置換・大域置換の中での各評価列の最高値．
+  $*$は標準に対し，$\dagger$は単純共有に対し
+  $p<0.05$．}
+  \label{tab:main}
+  % 各スコアは「値」「±」「誤差と有意差記号」の3欄に分け，±の位置を縦にそろえる．
+  \begin{tabular}{l@{\hspace{14pt}}rr@{${\pm}$}l@{\hspace{14pt}}rr@{${\pm}$}l@{\hspace{14pt}}rr@{${\pm}$}l}
+    \toprule
+    & \multicolumn{3}{c}{COGS} & \multicolumn{3}{c}{IWSLT14} & \multicolumn{3}{c}{Multi30k} \\
+    \cmidrule(r){2-4}\cmidrule(lr){5-7}\cmidrule(l){8-10}
+    モデル & 削減 & \multicolumn{2}{c}{汎化完全一致 $\uparrow$}
+          & 削減 & \multicolumn{2}{c}{BLEU $\uparrow$}
+          & 削減 & \multicolumn{2}{c}{BLEU $\uparrow$} \\
+    \midrule
+    標準       & \phantom{0}0.0\% & $76.41$ & $4.02$
+               & \phantom{0}0.0\% & $33.45$ & $0.51$
+               & \phantom{0}0.0\% & $40.78$ & $1.74$ \\
+    同規模標準 & 35.7\% & $79.46$ & $1.25$
+               & 25.7\% & $32.94$ & $0.50^{*}$
+               & 13.6\% & $40.00$ & $1.69^{*}$ \\
+    単純共有   & 35.5\% & $80.76$ & $1.06^{*}$
+               & 25.7\% & $31.58$ & $0.49^{*}$
+               & 15.0\% & $38.64$ & $1.64^{*}$ \\
+    \midrule
+    \emph{局所置換}：4トークン & 35.2\% & $79.07$ & $1.53$
+               & 25.5\% & $31.70$ & $0.50^{*}$
+               & 14.5\% & $38.76$ & $1.64^{*}$ \\
+    トークン別 & 35.2\% & $79.08$ & $1.47$
+               & 25.5\% & $32.19$ & $0.49^{*\dagger}$
+               & 14.5\% & $39.24$ & $1.66^{*}$ \\
+    チャネル群 & 35.5\% & $\mathbf{80.59}$ & $\mathbf{2.16}$
+               & 25.7\% & $31.71$ & $0.49^{*}$
+               & 15.0\% & $38.43$ & $1.66^{*}$ \\
+    べき付き   & 35.5\% & $78.84$ & $2.96$
+               & 25.7\% & $31.68$ & $0.49^{*}$
+               & 15.0\% & $38.92$ & $1.62^{*}$ \\
+    全箇所     & 34.6\% & $80.01$ & $0.91$
+               & 25.0\% & $32.19$ & $0.48^{*\dagger}$
+               & 13.4\% & $\mathbf{39.35}$ & $\mathbf{1.71}^{*\dagger}$ \\
+    \midrule
+    \emph{大域置換}：Beneš & 35.1\% & $76.04$ & $0.55$
+               & 25.4\% & $\mathbf{32.21}$ & $\mathbf{0.50}$
+               & 14.3\% & $38.87$ & $1.60$ \\
+    \bottomrule
+  \end{tabular}
+\end{table*}
+
+\section{結果}
+\label{sec:results}
+
+表\ref{tab:main}に主な結果を示す．単純共有は標準からMulti30kで2.13，IWSLT14で1.86 BLEU失う．
+局所置換では，IWSLT14のトークン別と全箇所の2変種が単純共有から0.61／0.60 BLEUを，Multi30kでは
+全箇所が0.70 BLEUを有意に回復する（\textbf{問い1：翻訳では改善}）．しかしいずれも同規模標準
+を0.65--0.75下回る（\textbf{問い2：翻訳では届かない}）．COGSでは単純共有が最も高く，どの変種
+も上回らない．
+
+大域置換のBenešは，IWSLT14で32.21と局所置換の最良（32.19）と同水準，Multi30kで38.87と
+局所置換の最良（39.35）に届かず，COGSでは1回の学習ではあるが76.04で単純共有を4.72ポイント
+下回り9モデル中最低である（\textbf{問い4：上回らない}）．なおBenešのMulti30kは3回の学習の
+うち開発BLEUが最良の1本で，有利な選び方でも上回らない．
+問い3の対照実験では，置換の合成について閉じていない（群をなさない）8置換集合3種の開発BLEU平均が39.24／39.43／39.18で，類推8置換の39.36との差は
+$+0.08$，正なのは3回の学習のうち1回である．全24置換（$S_4$）も39.33で同程度である
+（\textbf{問い3：$D_8$特有の優位は見えない}）．
+
+\section{考察とまとめ}
+\label{sec:discussion}
+
+局所置換は単純共有の損失の約3分の1を有意に回復し，学習済みモデルは$Q$/$K$/$V$で互いに異なる
+ほぼ離散的な置換を選んでいた（最大の混合重みの平均が0.89--0.91，役割間の混合重み分布の
+正規化Jensen--Shannonダイバージェンスが0.85--0.88）．Multi30k開発集合でルータの出力を一様
+分布に固定すると1.3--2.2，ゲートを閉じると2.2--11.6 BLEU落ちる．
+第\ref{sec:local}節の機構が実際に使われている証拠である．
+
+一方，期待した大域置換のBenešは効かなかった．理由は3つ考えられる．第一に，$\Pi_K,\Pi_V$は
+静的である．静的な置換は，役割が1つだけならば$W_S$に吸収されてしまう（第\ref{sec:benes}節）．
+3つの役割が$W_S$を共有しているので$\Pi_K,\Pi_V$自体は残るが，増えるのは「どの4チャネルを
+組にするか」の自由度だけで，役割を入力に応じて作り分ける力は増えない．第二に，この変種は
+倍率$\lambda_r$を持たない．ただし倍率の有無だけを
+変えて学習したときの差はMulti30kの開発集合で$+0.08$ BLEUと小さく，
+この説明は弱い．第三に，勾配が近似であり，$d=512$では4,352個のスイッチが同時に動くため
+学習が不安定になった可能性がある．
+
+言えるのは「入力と役割に条件付けられた\emph{局所的な}置換の混合が対角行列を上回りうる」
+ところまでである．類推は候補を絞る設計原理としては機能したが，精度向上の要因とは示せて
+いない．今後は大域置換も入力に応じて選べるようにしたい．
+
+% 本文は4ページを使用し，参考文献は5ページ目から始める．
+\clearpage
+% 参考文献は junsrt.bst で生成したものを直接書き込んである（BibTeX 不要，lualatex 2回で完成）．
+% 文献を足す・直すときは references.bib を直してから upbibtex -kanji=utf8 で作り直し，
+% できた main.bbl の中身でこの環境を置き換える．
+\begin{thebibliography}{10}
+
+\bibitem{vaswani2017attention}
+Ashish Vaswani, Noam Shazeer, Niki Parmar, Jakob Uszkoreit, Llion Jones, Aidan~N. Gomez, {\L}ukasz Kaiser, and Illia Polosukhin.
+\newblock Attention is all you need.
+\newblock In {\em Advances in Neural Information Processing Systems}, Vol.~30, pp. 5998--6008. Curran Associates, Inc., 2017.
+
+\bibitem{kayyam2026three}
+Ali Kayyam, Anusha Madan~Gopal, and M.~Anthony Lewis.
+\newblock Do transformers need three projections? {S}ystematic study of {QKV} variants.
+\newblock In {\em Proceedings of the 43rd International Conference on Machine Learning}, Vol. 306 of {\em Proceedings of Machine Learning Research}. PMLR, July 2026.
+
+\bibitem{lepage2025jiaf}
+Yves Lepage and Miguel Couceiro.
+\newblock Numerical analogy revisited and extended, refined, shrunk or enlarged.
+\newblock In Ana{\"e}lle Wilczynski, Fran{\c{c}}ois Schwarzentruber, and Jean-Guy Mailly, editors, {\em Proceedings of the 19th Journ{\'e}es d'Intelligence Artificielle Fondamentale ({JIAF} 2025)}, Dijon, France, July 2025.
+\newblock (in French).
+
+\bibitem{benes1964permutation}
+V{\'a}clav~E. Bene{\v{s}}.
+\newblock Optimal rearrangeable multistage connecting networks.
+\newblock {\em Bell System Technical Journal}, Vol.~43, No.~4, pp. 1641--1656, 1964.
+
+\bibitem{ainslie2023gqa}
+Joshua Ainslie, James Lee-Thorp, Michiel de~Jong, Yury Zemlyanskiy, Federico Lebr{\'o}n, and Sumit Sanghai.
+\newblock {GQA}: Training generalized multi-query transformer models from multi-head checkpoints.
+\newblock In {\em Proceedings of the 2023 Conference on Empirical Methods in Natural Language Processing}, pp. 4895--4901, Singapore, December 2023. Association for Computational Linguistics.
+
+\bibitem{tay2020sparsesinkhorn}
+Yi~Tay, Dara Bahri, Liu Yang, Donald Metzler, and Da-Cheng Juan.
+\newblock Sparse {S}inkhorn attention.
+\newblock In {\em Proceedings of the 37th International Conference on Machine Learning}, Vol. 119 of {\em Proceedings of Machine Learning Research}, pp. 9438--9447. PMLR, July 2020.
+
+\bibitem{chen2021permuteformer}
+Peng Chen.
+\newblock {P}ermute{F}ormer: Efficient relative position encoding for long sequences.
+\newblock In {\em Proceedings of the 2021 Conference on Empirical Methods in Natural Language Processing}, pp. 10606--10618, Online and Punta Cana, Dominican Republic, November 2021. Association for Computational Linguistics.
+
+\bibitem{kowsher2025separate}
+Md~Kowsher, Nusrat~Jahan Prottasha, Chun-Nam Yu, Ozlem~Ozmen Garibay, and Niloofar Yousefi.
+\newblock Does self-attention need separate weights in transformers?
+\newblock In {\em Proceedings of the 2025 Conference of the Nations of the Americas Chapter of the Association for Computational Linguistics: Human Language Technologies (Volume 3: Industry Track)}, pp. 535--543, Albuquerque, New Mexico, April 2025. Association for Computational Linguistics.
+
+\bibitem{rallier1765proportion}
+Jean-Joseph Rallier~des Ourmes.
+\newblock Proportion.
+\newblock In Denis Diderot and Jean le~Rond d'Alembert, editors, {\em Encyclop{\'e}die, ou Dictionnaire raisonn{\'e} des sciences, des arts et des m{\'e}tiers}, Vol.~13, pp. 466--470. Samuel Faulche \& Compagnie, Neufchastel, 1765.
+
+\bibitem{csordas2021devil}
+R{\'o}bert Csord{\'a}s, Kazuki Irie, and J{\"u}rgen Schmidhuber.
+\newblock The devil is in the detail: Simple tricks improve systematic generalization of transformers.
+\newblock In {\em Proceedings of the 2021 Conference on Empirical Methods in Natural Language Processing}, pp. 619--634, Online and Punta Cana, Dominican Republic, November 2021. Association for Computational Linguistics.
+
+\bibitem{wu2019payless}
+Felix Wu, Angela Fan, Alexei Baevski, Yann~N. Dauphin, and Michael Auli.
+\newblock Pay less attention with lightweight and dynamic convolutions.
+\newblock In {\em 7th International Conference on Learning Representations ({ICLR} 2019)}, New Orleans, Louisiana, 2019.
+
+\bibitem{wu2021misconceived}
+Zhiyong Wu, Lingpeng Kong, Wei Bi, Xiang Li, and Ben Kao.
+\newblock Good for misconceived reasons: An empirical revisiting on the need for visual context in multimodal machine translation.
+\newblock In {\em Proceedings of the 59th Annual Meeting of the Association for Computational Linguistics and the 11th International Joint Conference on Natural Language Processing (Volume 1: Long Papers)}, pp. 6153--6166, Online, August 2021. Association for Computational Linguistics.
+
+\bibitem{kim2020cogs}
+Najoung Kim and Tal Linzen.
+\newblock {COGS}: A compositional generalization challenge based on semantic interpretation.
+\newblock In {\em Proceedings of the 2020 Conference on Empirical Methods in Natural Language Processing ({EMNLP})}, pp. 9087--9105, Online, November 2020. Association for Computational Linguistics.
+
+\bibitem{elliott2016multi30k}
+Desmond Elliott, Stella Frank, Khalil Sima{'}an, and Lucia Specia.
+\newblock {M}ulti30{K}: Multilingual {E}nglish-{G}erman image descriptions.
+\newblock In {\em Proceedings of the 5th Workshop on Vision and Language}, pp. 70--74, Berlin, Germany, August 2016. Association for Computational Linguistics.
+
+\bibitem{cettolo2014iwslt}
+Mauro Cettolo, Jan Niehues, Sebastian St{\"u}ker, Luisa Bentivogli, and Marcello Federico.
+\newblock Report on the 11th {IWSLT} evaluation campaign.
+\newblock In {\em Proceedings of the 11th International Workshop on Spoken Language Translation: Evaluation Campaign}, pp. 2--17, Lake Tahoe, California, December 2014.
+
+\bibitem{sennrich2016subword}
+Rico Sennrich, Barry Haddow, and Alexandra Birch.
+\newblock Neural machine translation of rare words with subword units.
+\newblock In {\em Proceedings of the 54th Annual Meeting of the Association for Computational Linguistics (Volume 1: Long Papers)}, pp. 1715--1725, Berlin, Germany, August 2016. Association for Computational Linguistics.
+
+\bibitem{kudo2018sentencepiece}
+Taku Kudo and John Richardson.
+\newblock {SentencePiece}: A simple and language independent subword tokenizer and detokenizer for {Neural Text Processing}.
+\newblock In {\em Proceedings of the 2018 Conference on Empirical Methods in Natural Language Processing: System Demonstrations}, pp. 66--71, Brussels, Belgium, November 2018. Association for Computational Linguistics.
+
+\bibitem{post2018sacrebleu}
+Matt Post.
+\newblock A call for clarity in reporting {BLEU} scores.
+\newblock In {\em Proceedings of the Third Conference on Machine Translation: Research Papers}, pp. 186--191, Brussels, Belgium, October 2018. Association for Computational Linguistics.
+
+\bibitem{koehn2004statistical}
+Philipp Koehn.
+\newblock Statistical significance tests for machine translation evaluation.
+\newblock In {\em Proceedings of the 2004 Conference on Empirical Methods in Natural Language Processing}, pp. 388--395, Barcelona, Spain, July 2004. Association for Computational Linguistics.
+
+\end{thebibliography}
+
+\end{document}
